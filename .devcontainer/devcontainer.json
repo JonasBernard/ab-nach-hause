@@ -1,0 +1,33 @@
+{
+  "name": "Mathe-At-Home: Ab nach Hause",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.languageServer": "Default"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "ms-python.vscode-pylance",
+        "ms-vsliveshare.vsliveshare"
+      ]
+    }
+  },
+
+  "postCreateCommand": "pip install --upgrade pip && pip install networkx pyrosm jupyter matplotlib",
+
+  "forwardPorts": [8080],
+
+  "portsAttributes": {
+    "8080": {
+      "label": "Web Server",
+      "onAutoForward": "openBrowser"
+    }
+  },
+
+  //"remoteUser": "vscode"
+}
+
