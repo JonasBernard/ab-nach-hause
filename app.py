@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
+from scipy.spatial import cKDTree
 
 pbf_file = "osm_data/kiel.osm.pbf"
 pbf_viewport = {
@@ -18,7 +19,9 @@ pbf_viewport = {
 default_start = [54.33801, 10.14178]
 default_target = [54.30776, 10.14546]
 
-stream_sleep = 0.01
+stream_edges = False
+batch_size = 10
+stream_sleep = 0.001
 
 # --- LIFESPAN STARTUP: KARTENDATEN EINMALIG IN ARBEITSSPEICHER LADEN ---
 def load_graph():
@@ -46,6 +49,45 @@ def load_graph():
 
     # Nur Nodes behalten, die auch im zusammenhängenden Graphen vorkommen
     # nodes_gdf = nodes_gdf[nodes_gdf['id'].isin(G.nodes)].copy()
+
+
+####
+
+    # ==============================================================================
+    # PRE-COMPUTED GRAPH MAPS & ARRAYS (Run once when graph G is created)
+    # ==============================================================================
+    # 1. Coordinate arrays indexed by igraph vertex index (0..N-1)
+    global lats
+    global lons
+    global osm_ids
+
+    lats = G.vs["lat"]  # or "lat", depending on your attribute name in G
+    lons = G.vs["lon"]  # or "lon", depending on your attribute name in G
+    osm_ids = G.vs["id"]
+
+    global osm_id_to_idx
+    global coords_list
+    global edge_weights
+
+    # 2. Fast mapping: OSM node ID -> igraph vertex index
+    osm_id_to_idx = {node_id: idx for idx, node_id in enumerate(osm_ids)}
+
+    # 3. Fast lookup tuple array for streaming JSON coordinates
+    coords_list = list(zip(lats, lons))
+
+    # 4. Pre-extracted edge weights array for O(1) weight lookups
+    edge_weights = G.es["length"]
+
+    global spatial_tree
+
+    # Create spatial index ONCE when loading the graph
+    # Coordinates array [lat, lon] matching igraph vertex order 0..N-1
+    coords_matrix = list(zip(lats, lons))
+    spatial_tree = cKDTree(coords_matrix)
+
+####
+
+
     print("Kartendaten erfolgreich geladen. Einsatzbereit.")
 
 
@@ -80,105 +122,60 @@ def metric_distance(coord1, coord2):
     lat2, lon2 = math.radians(coord2[0]), math.radians(coord2[1])
     dlat, dlon = lat2 - lat1, lon2 - lon1
     return math.sqrt(dlat*dlat + dlon*dlon)
- 
-def find_nearest_node(target_lat, target_lon):
-    min_dist = float('inf')
-    nearest_node_id = None
-    for idx, row in nodes_gdf.iterrows():
-        dist = metric_distance((target_lat, target_lon), (row['lat'], row['lon']))
-        if dist < min_dist:
-            min_dist = dist
-            nearest_node_id = row['id']
-    return nearest_node_id
 
-def get_min_edge_length(G, u, v) -> float:
-    """Ermittelt sicher die kürzeste Kantenlänge zwischen zwei Knoten."""
-    edge_data = G.get_edge_data(u, v)
-    if not edge_data:
+def find_nearest_node(target_lat: float, target_lon: float) -> int:
+    """Returns the igraph vertex index of the closest node in microsecond speed."""
+    # spatial_tree returns the direct integer index (0..N-1) of the nearest neighbor
+    _, nearest_vertex_idx = spatial_tree.query([target_lat, target_lon])
+    return int(nearest_vertex_idx)
+
+def get_min_edge_length_igraph(G, u_idx: int, v_idx: int) -> float:
+    """
+    Finds shortest edge length between two igraph vertex indices.
+    Handles multigraph edges between u and v if present.
+    """
+    eids = G.get_eids(pairs=[(u_idx, v_idx)], directed=True, error=False)
+    if eids == -1 or not eids:
+        # Fallback if no direct single edge was returned
         return 1.0
     
-    # Falls NetworkX MultiGraph: Dict aus {edge_key: {attr_dict}}
-    if isinstance(edge_data, dict):
-        lengths = []
-        for key, data in edge_data.items():
-            if isinstance(data, dict) and 'length' in data:
-                lengths.append(data['length'])
-        if lengths:
-            return min(lengths)
-        if 'length' in edge_data:
-            return edge_data['length']
-            
-    return 1.0
+    if isinstance(eids, int):
+        return edge_weights[eids]
+        
+    return min(edge_weights[e] for e in eids)
 
+# ==============================================================================
+# FASTAPI SSE ENDPOINT
+# ==============================================================================
 @app.get("/stream-route")
 async def stream_route(start_lat: float, start_lon: float, target_lat: float, target_lon: float):
     """
-    Echtzeit-Streaming des A*-Fortschritts via SSE.
+    Echtzeit-Streaming des A*-Fortschritts via SSE using igraph.
     """
     start_node = find_nearest_node(start_lat, start_lon)
     target_node = find_nearest_node(target_lat, target_lon)
 
-    if not start_node or not target_node:
+    if start_node is None or target_node is None:
         raise HTTPException(status_code=400, detail="Start- oder Zielknoten nicht gefunden.")
 
-    # if mode == "walking":
-    #    pass
+    # Target node coordinates for heuristic
+    target_coords = coords_list[target_node]
+    target_lat_val, target_lon_val = target_coords
 
-    # Koordinaten des Zielknotens für die Heuristik abfragen
-    target_row = nodes_gdf.loc[nodes_gdf['id'] == target_node].iloc[0]
-    target_coords = (target_row['lat'], target_row['lon'])
-
-    # TODO either use efficiently or not compute it
-    coords_dict = dict(zip(nodes_gdf['id'], zip(nodes_gdf['lat'], nodes_gdf['lon'])))
-
-
-    ##### Umrechnung in Meter Coordinaten
-    # # Projiziert automatisch in die passende lokale UTM-Zone (in Metern)
-    # nodes_gdf_projected = nodes_gdf.to_crs(nodes_gdf.estimate_utm_crs())
-
-    # # Erstellt ein Wörterbuch: node_id -> (x_meter, y_meter)
-    # node_coords_lookup = nodes_gdf_projected.set_index('id')[['x', 'y']].to_dict('index')
-
-    # # Target-Koordinaten ebenfalls projizieren
-    # target_x, target_y = target_projected_coords
-
-    # def heuristic(node_id):
-    #     coords = node_coords_lookup[node_id]
-    #     dx = coords['x'] - target_x
-    #     dy = coords['y'] - target_y
-    #     return math.hypot(dx, dy)
-    #####
-
-
-
-
-    # Mittlere Breite der Region einmalig berechnen (z.B. für Deutschland ca. 51°)
-    # Oder dynamisch: LAT_FACTOR = 111000, LON_FACTOR = 111000 * math.cos(math.radians(start_lat))
+    # Lat/Lon scale factors in meters
     LAT_METERS = 111000.0
-    LON_METERS = 111000.0 * math.cos(math.radians(target_coords[0]))
+    LON_METERS = 111000.0 * math.cos(math.radians(target_lat_val))
 
-    def heuristic(node_id):
-        """Heuristik h(n): Luftlinie vom gegebenen Knoten zum Zielknoten in Metern."""
-        node_lat, node_lon = coords_dict[node_id]
-    
-        dy = (float(node_lat) - target_coords[0]) * LAT_METERS
-        dx = (float(node_lon) - target_coords[1]) * LON_METERS
-    
-        # Euklidische Distanz in Metern: sqrt(dx^2 + dy^2)
+    def heuristic(node_idx: int) -> float:
+        """Heuristik h(n): Vectorized index access for optimal loop speed."""
+        dy = (lats[node_idx] - target_lat_val) * LAT_METERS
+        dx = (lons[node_idx] - target_lon_val) * LON_METERS
         return math.hypot(dx, dy)
-
-        # node_x, node_y = node_coords_lookup[node_id]  # in projected meters
-        # target_x, target_y = target_coords
-        # return math.hypot(node_x - target_x, node_y - target_y)
-
-        # TODO use Haversine?
-        # coords = node_coords_lookup[node_id]
-        # return haversine_distance((coords['lat'], coords['lon']), target_coords)
 
     async def event_generator():
         try:
-            start_row = nodes_gdf.loc[nodes_gdf['id'] == start_node].iloc[0]
-            start_coords = (start_row['lat'], start_row['lon'])
+            start_coords = coords_list[start_node]
+            
             yield {
                 "event": "start_snap",
                 "data": json.dumps(start_coords)
@@ -189,16 +186,17 @@ async def stream_route(start_lat: float, start_lon: float, target_lat: float, ta
                 "data": json.dumps(target_coords)
             }
 
+            num_vertices = G.vcount()
+            
+            # Using fixed-size arrays indexed by vertex ID for maximum performance
+            g_score = [float('inf')] * num_vertices
+            g_score[start_node] = 0.0
+            
+            previous_nodes = [None] * num_vertices
+            closed_set = [False] * num_vertices
+
             tiecount = 0
             pq = [(heuristic(start_node), tiecount, start_node)]
-            # Priority Queue: (f_score, a counter for ties, node_id)
-            
-            # g_score speichert die bisher kürzesten Distanzen vom Start
-            g_score = {start_node: 0.0}
-            previous_nodes = {}
-            
-            # Set für final evaluierte Knoten (Closed List)
-            closed_set = set()
 
             batch_edges = []
             step_counter = 0
@@ -209,42 +207,41 @@ async def stream_route(start_lat: float, start_lon: float, target_lat: float, ta
                 if current_node == target_node:
                     break
 
-                if current_node in closed_set:
+                if closed_set[current_node]:
                     continue
 
-                closed_set.add(current_node)
+                closed_set[current_node] = True
                 step_counter += 1
 
                 # Kante zum Vorgänger für die Visualisierung sammeln
-                prev_node = previous_nodes.get(current_node)
-                if prev_node and prev_node in coords_dict and current_node in coords_dict:
+                prev_node = previous_nodes[current_node]
+                if prev_node is not None:
                     batch_edges.append({
-                        "from": coords_dict[prev_node],
-                        "to": coords_dict[current_node]
+                        "from": coords_list[prev_node],
+                        "to": coords_list[current_node]
                     })
 
-                # Stream-Batch alle 15 Schritte senden (verhindert SSE-Flaschenhals)
-                if len(batch_edges) >= 15:
+                if len(batch_edges) >= batch_size and stream_edges:
                     yield {
                         "event": "edges_explored",
                         "data": json.dumps({"edges": batch_edges, "step": step_counter})
                     }
                     batch_edges = []
-                    assert stream_sleep != 0.0
-                    await asyncio.sleep(stream_sleep)  # Gibt dem Event-Loop Zeit zum Senden
+                    await asyncio.sleep(stream_sleep)
 
-                # Nachbarn untersuchen (Open List Updates)
-                for neighbor in G.neighbors(current_node):
-                    if neighbor in closed_set:
-                        # KORREKT: Nur abbrechen, wenn der Knoten bereits final abgeschlossen ist
-                        # (Voraussetzung: Admissible/Consistent Heuristik)
+                # Nachbarn über outgoing incident edges untersuchen
+                # G.incident(current_node, mode="out") returns outgoing edge indices
+                for edge_id in G.incident(current_node, mode="out"):
+                    edge = G.es[edge_id]
+                    neighbor = edge.target  # Target vertex index
+                    
+                    if closed_set[neighbor]:
                         continue
 
-                    weight = get_min_edge_length(G, current_node, neighbor)
+                    weight = edge_weights[edge_id]
                     tentative_g = g_score[current_node] + weight
 
-                    # KORREKT: Prūfen, ob dieser Weg zum Nachbarn besser ist als bisherige
-                    if tentative_g < g_score.get(neighbor, float('inf')):
+                    if tentative_g < g_score[neighbor]:
                         g_score[neighbor] = tentative_g
                         previous_nodes[neighbor] = current_node
                         f_score = tentative_g + heuristic(neighbor)
@@ -252,22 +249,22 @@ async def stream_route(start_lat: float, start_lon: float, target_lat: float, ta
                         heapq.heappush(pq, (f_score, tiecount, neighbor))
 
             # Restliche gepufferte Kanten senden
-            if batch_edges:
+            if batch_edges and stream_edges:
                 yield {
                     "event": "edges_explored",
                     "data": json.dumps({"edges": batch_edges, "step": step_counter})
                 }
 
             # Route rekonstruieren
-            if target_node in g_score:
+            if g_score[target_node] < float('inf'):
                 path_nodes = []
                 curr = target_node
                 while curr is not None:
                     path_nodes.append(curr)
-                    curr = previous_nodes.get(curr)
+                    curr = previous_nodes[curr]
                 path_nodes.reverse()
 
-                route_coords = [coords_dict[nid] for nid in path_nodes if nid in coords_dict]
+                route_coords = [coords_list[nid] for nid in path_nodes]
 
                 yield {
                     "event": "route_found",
@@ -286,7 +283,6 @@ async def stream_route(start_lat: float, start_lon: float, target_lat: float, ta
                 "event": "error",
                 "data": json.dumps({"message": "Fehler: " + str(e)})
             }
-
 
     return EventSourceResponse(event_generator())
 

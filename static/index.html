@@ -72,10 +72,14 @@
 
         [map, startMarker, targetMarker] = initMap();
 
-        startMarker.on('dragend', startLiveRoute);
-        targetMarker.on('dragend', startLiveRoute);
+        startMarker.on('dragend', () => startLiveRoute(false));
+        targetMarker.on('dragend', () => startLiveRoute(false));
 
-        setTimeout(() => startLiveRoute(map, startMarker, targetMarker), 1000);
+
+        startMarker.on('drag', () => startLiveRoute(true));
+        targetMarker.on('drag', () => startLiveRoute(true));
+
+        setTimeout(() => startLiveRoute(false), 1000);
       })
       .catch(err => {
         console.warn("Failed to fetch coordinates, using defaults:", err);
@@ -120,17 +124,14 @@
       return [map, startMarker, targetMarker];
     }
 
-    function startLiveRoute() {
+    function startLiveRoute(isDragging) {
       if (eventSource) eventSource.close();
-
-      // Reset view
-      exploredPolyline.setLatLngs([]);
-      if (routePolyline) map.removeLayer(routePolyline);
 
       document.getElementById('status-text').innerText = 'Suche läuft...';
       document.getElementById('status-error').innerText = '';
 
-      exploredEdgesGroup.clearLayers();
+      let resetExploredDue = true;
+      let resetResultDue = true;
 
       const s = startMarker.getLatLng();
       const t = targetMarker.getLatLng();
@@ -143,25 +144,38 @@
 
         document.getElementById('status-error').innerText = data.message;
 
-        console.err(data.message);
+        console.log(data.message);
       })
 
-      eventSource.addEventListener('start_snap', (e) => {
-        const data = JSON.parse(e.data);
+      // Snaping while draggin is flickering
+      if (!isDragging) {
+        eventSource.addEventListener('start_snap', (e) => {
+          const data = JSON.parse(e.data);
 
-        startMarker.setLatLng(data);
-      });
+          startMarker.setLatLng(data);
+        });
 
+        eventSource.addEventListener('target_snap', (e) => {
+          const data = JSON.parse(e.data);
 
-      eventSource.addEventListener('target_snap', (e) => {
-        const data = JSON.parse(e.data);
-
-        targetMarker.setLatLng(data);
-      });
-
+          targetMarker.setLatLng(data);
+        });
+      }
 
       eventSource.addEventListener('edges_explored', (e) => {
         const data = JSON.parse(e.data);
+
+        if (resetExploredDue) {
+          exploredEdgesGroup.clearLayers();
+          exploredPolyline.setLatLngs([]);
+          resetExploredDue = false;
+        }
+        if (resetResultDue) {
+          if (routePolyline) {
+            map.removeLayer(routePolyline);
+          }
+          resetResultDue = false;
+        }
 
         data.edges.forEach(edge => {
           L.polyline([edge.from, edge.to], {
@@ -176,6 +190,18 @@
 
       eventSource.addEventListener('route_found', (e) => {
         const data = JSON.parse(e.data);
+
+        if (resetExploredDue) {
+          exploredEdgesGroup.clearLayers();
+          exploredPolyline.setLatLngs([]);
+          resetExploredDue = false;
+        }
+        if (resetResultDue) {
+          if (routePolyline) {
+            map.removeLayer(routePolyline);
+          }
+          resetResultDue = false;
+        }
 
         routePolyline = L.polyline(data.coordinates, {
           color: '#0066ff',
