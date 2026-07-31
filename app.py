@@ -10,7 +10,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
-pbf_file = "osm_data/Darmstadt.osm.pbf"
+pbf_file = "osm_data/kiel.osm.pbf"
+pbf_viewport = {
+    "left_lower": [54.231,9.882],
+    "right_upper": [54.416, 10.383]
+}
+default_start = [54.33801, 10.14178]
+default_target = [54.30776, 10.14546]
+
+stream_sleep = 0.01
 
 # --- LIFESPAN STARTUP: KARTENDATEN EINMALIG IN ARBEITSSPEICHER LADEN ---
 def load_graph():
@@ -30,7 +38,7 @@ def load_graph():
     nodes_gdf, edges_gdf = nodes_gdf_all, edges_gdf_all
 
     # Graph aufbauen
-    G = osm.to_graph(nodes_gdf, edges_gdf, graph_type="networkx", simplify=False)
+    G = osm.to_graph(nodes_gdf, edges_gdf, simplify=True)
     
     # Auf größten zusammenhängenden Teilgraphen reduzieren (Inseln vermeiden)
     # largest_cc = max(nx.strongly_connected_components(G_raw), key=len)
@@ -56,8 +64,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def haversine_distance(coord1, coord2):
-    R = 6371000.0
+@app.get("/startup-coords")
+def get_startup_coords():
+    return {
+        "defaultView": [
+           (pbf_viewport["left_lower"][0] + pbf_viewport["right_upper"][0]) / 2,
+           (pbf_viewport["left_lower"][1] + pbf_viewport["right_upper"][1]) / 2,
+        ],
+        "startPos": default_start,
+        "endPos": default_target
+    }
+
+def metric_distance(coord1, coord2):
     lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
     lat2, lon2 = math.radians(coord2[0]), math.radians(coord2[1])
     dlat, dlon = lat2 - lat1, lon2 - lon1
@@ -67,7 +85,7 @@ def find_nearest_node(target_lat, target_lon):
     min_dist = float('inf')
     nearest_node_id = None
     for idx, row in nodes_gdf.iterrows():
-        dist = haversine_distance((target_lat, target_lon), (row['lat'], row['lon']))
+        dist = metric_distance((target_lat, target_lon), (row['lat'], row['lon']))
         if dist < min_dist:
             min_dist = dist
             nearest_node_id = row['id']
@@ -158,97 +176,117 @@ async def stream_route(start_lat: float, start_lon: float, target_lat: float, ta
         # return haversine_distance((coords['lat'], coords['lon']), target_coords)
 
     async def event_generator():
-        tiecount = 0
-        pq = [(heuristic(start_node), tiecount, start_node)]
-        # Priority Queue: (f_score, a counter for ties, node_id)
-        
-        # g_score speichert die bisher kürzesten Distanzen vom Start
-        g_score = {start_node: 0.0}
-        previous_nodes = {}
-        
-        # Set für final evaluierte Knoten (Closed List)
-        closed_set = set()
+        try:
+            start_row = nodes_gdf.loc[nodes_gdf['id'] == start_node].iloc[0]
+            start_coords = (start_row['lat'], start_row['lon'])
+            yield {
+                "event": "start_snap",
+                "data": json.dumps(start_coords)
+            }
 
-        batch_edges = []
-        step_counter = 0
+            yield {
+                "event": "target_snap",
+                "data": json.dumps(target_coords)
+            }
 
-        while pq:
-            current_f, _, current_node = heapq.heappop(pq)
+            tiecount = 0
+            pq = [(heuristic(start_node), tiecount, start_node)]
+            # Priority Queue: (f_score, a counter for ties, node_id)
+            
+            # g_score speichert die bisher kürzesten Distanzen vom Start
+            g_score = {start_node: 0.0}
+            previous_nodes = {}
+            
+            # Set für final evaluierte Knoten (Closed List)
+            closed_set = set()
 
-            if current_node == target_node:
-                break
+            batch_edges = []
+            step_counter = 0
 
-            if current_node in closed_set:
-                continue
+            while pq:
+                current_f, _, current_node = heapq.heappop(pq)
 
-            closed_set.add(current_node)
-            step_counter += 1
+                if current_node == target_node:
+                    break
 
-            # Kante zum Vorgänger für die Visualisierung sammeln
-            prev_node = previous_nodes.get(current_node)
-            if prev_node and prev_node in coords_dict and current_node in coords_dict:
-                batch_edges.append({
-                    "from": coords_dict[prev_node],
-                    "to": coords_dict[current_node]
-                })
+                if current_node in closed_set:
+                    continue
 
-            # Stream-Batch alle 15 Schritte senden (verhindert SSE-Flaschenhals)
-            if len(batch_edges) >= 15:
+                closed_set.add(current_node)
+                step_counter += 1
+
+                # Kante zum Vorgänger für die Visualisierung sammeln
+                prev_node = previous_nodes.get(current_node)
+                if prev_node and prev_node in coords_dict and current_node in coords_dict:
+                    batch_edges.append({
+                        "from": coords_dict[prev_node],
+                        "to": coords_dict[current_node]
+                    })
+
+                # Stream-Batch alle 15 Schritte senden (verhindert SSE-Flaschenhals)
+                if len(batch_edges) >= 15:
+                    yield {
+                        "event": "edges_explored",
+                        "data": json.dumps({"edges": batch_edges, "step": step_counter})
+                    }
+                    batch_edges = []
+                    assert stream_sleep != 0.0
+                    await asyncio.sleep(stream_sleep)  # Gibt dem Event-Loop Zeit zum Senden
+
+                # Nachbarn untersuchen (Open List Updates)
+                for neighbor in G.neighbors(current_node):
+                    if neighbor in closed_set:
+                        # KORREKT: Nur abbrechen, wenn der Knoten bereits final abgeschlossen ist
+                        # (Voraussetzung: Admissible/Consistent Heuristik)
+                        continue
+
+                    weight = get_min_edge_length(G, current_node, neighbor)
+                    tentative_g = g_score[current_node] + weight
+
+                    # KORREKT: Prūfen, ob dieser Weg zum Nachbarn besser ist als bisherige
+                    if tentative_g < g_score.get(neighbor, float('inf')):
+                        g_score[neighbor] = tentative_g
+                        previous_nodes[neighbor] = current_node
+                        f_score = tentative_g + heuristic(neighbor)
+                        tiecount += 1
+                        heapq.heappush(pq, (f_score, tiecount, neighbor))
+
+            # Restliche gepufferte Kanten senden
+            if batch_edges:
                 yield {
                     "event": "edges_explored",
                     "data": json.dumps({"edges": batch_edges, "step": step_counter})
                 }
-                batch_edges = []
-                await asyncio.sleep(0.1)  # Gibt dem Event-Loop Zeit zum Senden
 
-            # Nachbarn untersuchen (Open List Updates)
-            for neighbor in G.neighbors(current_node):
-                if neighbor in closed_set:
-                    # KORREKT: Nur abbrechen, wenn der Knoten bereits final abgeschlossen ist
-                    # (Voraussetzung: Admissible/Consistent Heuristik)
-                    continue
+            # Route rekonstruieren
+            if target_node in g_score:
+                path_nodes = []
+                curr = target_node
+                while curr is not None:
+                    path_nodes.append(curr)
+                    curr = previous_nodes.get(curr)
+                path_nodes.reverse()
 
-                weight = get_min_edge_length(G, current_node, neighbor)
-                tentative_g = g_score[current_node] + weight
+                route_coords = [coords_dict[nid] for nid in path_nodes if nid in coords_dict]
 
-                # KORREKT: Prūfen, ob dieser Weg zum Nachbarn besser ist als bisherige
-                if tentative_g < g_score.get(neighbor, float('inf')):
-                    g_score[neighbor] = tentative_g
-                    previous_nodes[neighbor] = current_node
-                    f_score = tentative_g + heuristic(neighbor)
-                    tiecount += 1
-                    heapq.heappush(pq, (f_score, tiecount, neighbor))
-
-        # Restliche gepufferte Kanten senden
-        if batch_edges:
-            yield {
-                "event": "edges_explored",
-                "data": json.dumps({"edges": batch_edges, "step": step_counter})
-            }
-
-        # Route rekonstruieren
-        if target_node in g_score:
-            path_nodes = []
-            curr = target_node
-            while curr is not None:
-                path_nodes.append(curr)
-                curr = previous_nodes.get(curr)
-            path_nodes.reverse()
-
-            route_coords = [coords_dict[nid] for nid in path_nodes if nid in coords_dict]
-
-            yield {
-                "event": "route_found",
-                "data": json.dumps({
-                    "distance_meters": g_score[target_node],
-                    "coordinates": route_coords
-                })
-            }
-        else:
+                yield {
+                    "event": "route_found",
+                    "data": json.dumps({
+                        "distance_meters": g_score[target_node],
+                        "coordinates": route_coords
+                    })
+                }
+            else:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": "Keine Route gefunden"})
+                }
+        except BaseException as e:
             yield {
                 "event": "error",
-                "data": json.dumps({"message": "Keine Route gefunden"})
+                "data": json.dumps({"message": "Fehler: " + str(e)})
             }
+
 
     return EventSourceResponse(event_generator())
 

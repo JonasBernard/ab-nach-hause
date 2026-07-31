@@ -1,122 +1,197 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
   <meta charset="UTF-8">
-  <title>A* Live-Visualisierung mit Kanten</title>
+  <title>Ab nach Hause</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    body { margin: 0; padding: 0; font-family: sans-serif; }
-    #map { height: 100vh; width: 100vw; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100vw;
+    }
+
     .status-card {
       position: absolute;
-      top: 15px; right: 15px;
+      top: 15px;
+      right: 15px;
       z-index: 1000;
       background: rgba(255, 255, 255, 0.95);
       padding: 15px 20px;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       min-width: 200px;
     }
-    .status-card h3 { margin: 0 0 10px 0; font-size: 16px; }
+
+    .status-card h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
+
+    #status-error {
+      color: #8a1917;
+    }
   </style>
 </head>
+
 <body>
 
   <div class="status-card">
-    <h3>A* Live-Suche</h3>
-    <div>Kanten exploriert: <strong id="step-count">0</strong></div>
+    <h3>Ab nach Hause</h3>
+    <div>Kanten erkundet: <strong id="step-count">0</strong></div>
     <div>Status: <span id="status-text">Bereit</span></div>
+    <div><span id="status-error"></span></div>
   </div>
 
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([49.8725, 8.6410], 14);
+    // Define defaults upfront
+    let defaultView = [49.8725, 8.6410];
+    let startPos = [49.8725, 8.6294];
+    let endPos = [49.8722, 8.6528];
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+    let map, startMarker, targetMarker;
 
-    const exploredEdgesGroup = L.layerGroup().addTo(map);
+    fetch("/startup-coords")
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        defaultView = data.defaultView ?? defaultView;
+        startPos = data.startPos ?? startPos;
+        endPos = data.endPos ?? endPos;
+
+        [map, startMarker, targetMarker] = initMap();
+
+        startMarker.on('dragend', startLiveRoute);
+        targetMarker.on('dragend', startLiveRoute);
+
+        setTimeout(() => startLiveRoute(map, startMarker, targetMarker), 1000);
+      })
+      .catch(err => {
+        console.warn("Failed to fetch coordinates, using defaults:", err);
+      });
+
+    let exploredPolyline = null;
+    let exploredEdgesGroup = null;
     let routePolyline = null;
     let eventSource = null;
 
-    const greenIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41]
-    });
-    const redIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41]
-    });
+    function initMap() {
+      const map = L.map('map').setView(defaultView, 14);
 
-    const startMarker = L.marker([49.8725, 8.6294], { icon: greenIcon, draggable: true }).addTo(map);
-    const targetMarker = L.marker([49.8722, 8.6528], { icon: redIcon, draggable: true }).addTo(map);
-
-    let exploredPolyline = L.polyline([], {
-    color: '#ffaa00',
-    weight: 2.5,
-    opacity: 0.75
-  }).addTo(map);
-
-  function startLiveRoute() {
-    if (eventSource) eventSource.close();
-
-    // Reset der Ansicht
-    exploredPolyline.setLatLngs([]);
-    if (routePolyline) map.removeLayer(routePolyline);
-
-    document.getElementById('status-text').innerText = 'Suche läuft...';
-
-    exploredEdgesGroup.clearLayers();
-
-    const s = startMarker.getLatLng();
-    const t = targetMarker.getLatLng();
-    const url = `/stream-route?start_lat=${s.lat}&start_lon=${s.lng}&target_lat=${t.lat}&target_lon=${t.lng}`;
-    
-    eventSource = new EventSource(url);
-
-    eventSource.addEventListener('edges_explored', (e) => {
-      const data = JSON.parse(e.data);
-
-      // Fuege alle erhaltenen Kanten auf einmal zum Polyline-Layer hinzu
-      data.edges.forEach(edge => {
-        L.polyline([edge.from, edge.to], {
-          color: '#ffaa00',  // Gelb / Orange
-          weight: 4,
-          opacity: 0.75
-        }).addTo(exploredEdgesGroup);
-      });
-
-      document.getElementById('step-count').innerText = data.step;
-    });
-
-    eventSource.addEventListener('route_found', (e) => {
-      const data = JSON.parse(e.data);
-
-      routePolyline = L.polyline(data.coordinates, {
-        color: '#0066ff',
-        weight: 6,
-        opacity: 0.95,
-        lineJoin: 'round'
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        referrerPolicy: 'origin'
       }).addTo(map);
 
-      const distKm = (data.distance_meters / 1000).toFixed(2);
-      document.getElementById('status-text').innerText = `Fertig (${distKm} km)`;
+      exploredEdgesGroup = L.layerGroup().addTo(map);
 
-      eventSource.close();
-    });
-  }  
+      const greenIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41], iconAnchor: [12, 41]
+      });
+      const redIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41], iconAnchor: [12, 41]
+      });
 
-startMarker.on('dragend', startLiveRoute);
-    targetMarker.on('dragend', startLiveRoute);
+      const startMarker = L.marker(startPos, { icon: greenIcon, draggable: true }).addTo(map);
+      const targetMarker = L.marker(endPos, { icon: redIcon, draggable: true }).addTo(map);
 
-    startLiveRoute();
+      exploredPolyline = L.polyline([], {
+        color: '#ffaa00',
+        weight: 2.5,
+        opacity: 0.75
+      }).addTo(map);
+
+      return [map, startMarker, targetMarker];
+    }
+
+    function startLiveRoute() {
+      if (eventSource) eventSource.close();
+
+      // Reset view
+      exploredPolyline.setLatLngs([]);
+      if (routePolyline) map.removeLayer(routePolyline);
+
+      document.getElementById('status-text').innerText = 'Suche läuft...';
+      document.getElementById('status-error').innerText = '';
+
+      exploredEdgesGroup.clearLayers();
+
+      const s = startMarker.getLatLng();
+      const t = targetMarker.getLatLng();
+      const url = `/stream-route?start_lat=${s.lat}&start_lon=${s.lng}&target_lat=${t.lat}&target_lon=${t.lng}`;
+
+      eventSource = new EventSource(url);
+
+      eventSource.addEventListener('error', (e) => {
+        const data = JSON.parse(e.data);
+
+        document.getElementById('status-error').innerText = data.message;
+
+        console.err(data.message);
+      })
+
+      eventSource.addEventListener('start_snap', (e) => {
+        const data = JSON.parse(e.data);
+
+        startMarker.setLatLng(data);
+      });
+
+
+      eventSource.addEventListener('target_snap', (e) => {
+        const data = JSON.parse(e.data);
+
+        targetMarker.setLatLng(data);
+      });
+
+
+      eventSource.addEventListener('edges_explored', (e) => {
+        const data = JSON.parse(e.data);
+
+        data.edges.forEach(edge => {
+          L.polyline([edge.from, edge.to], {
+            color: '#ffaa00',  // Gelb / Orange
+            weight: 4,
+            opacity: 0.75
+          }).addTo(exploredEdgesGroup);
+        });
+
+        document.getElementById('step-count').innerText = data.step;
+      });
+
+      eventSource.addEventListener('route_found', (e) => {
+        const data = JSON.parse(e.data);
+
+        routePolyline = L.polyline(data.coordinates, {
+          color: '#0066ff',
+          weight: 6,
+          opacity: 0.95,
+          lineJoin: 'round'
+        }).addTo(map);
+
+        const distKm = (data.distance_meters / 1000).toFixed(2);
+        document.getElementById('status-text').innerText = `Fertig (${distKm} km)`;
+        
+        eventSource.close();
+      });
+    }
 
   </script>
 </body>
+
 </html>
