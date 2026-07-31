@@ -1,15 +1,14 @@
-import asyncio
+import os
+import math
 import json
 import heapq
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
-import os
+import asyncio
 import pyrosm
-import networkx as nx
-import math
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
 
 pbf_file = "osm_data/Darmstadt.osm.pbf"
 
@@ -22,31 +21,24 @@ def load_graph():
 
     print("Lade OSM-Daten im Hintergrund in den Arbeitsspeicher...")
     osm = pyrosm.OSM(pbf_file)
-    # nodes_gdf_walking, edges_gdf_walking = osm.get_network(network_type="walking", nodes=True)
-    nodes_gdf_driving, edges_gdf_driving = osm.get_network(network_type="driving", nodes=True)
+    #nodes_gdf_walking, edges_gdf_walking = osm.get_network(network_type="walking", nodes=True)
+    #nodes_gdf_driving, edges_gdf_driving = osm.get_network(network_type="driving", nodes=True)
     #nodes_gdf_cycling, edges_gdf_cycling = osm.get_network(network_type="cycling", nodes=True)
     #nodes_gdf_driving_service, edges_gdf_driving_service = osm.get_network(network_type="driving+service", nodes=True)
-    #nodes_gdf_all, edges_gdf_all = osm.get_network(network_type="all", nodes=True)
+    nodes_gdf_all, edges_gdf_all = osm.get_network(network_type="all", nodes=True)
 
-    nodes_gdf, edges_gdf = nodes_gdf_driving, edges_gdf_driving
+    nodes_gdf, edges_gdf = nodes_gdf_all, edges_gdf_all
 
     # Graph aufbauen
-    G_raw = osm.to_graph(nodes_gdf, edges_gdf, graph_type="networkx", simplify=True)
+    G = osm.to_graph(nodes_gdf, edges_gdf, graph_type="networkx", simplify=False)
     
     # Auf größten zusammenhängenden Teilgraphen reduzieren (Inseln vermeiden)
-    largest_cc = max(nx.strongly_connected_components(G_raw), key=len)
-    G = G_raw.subgraph(largest_cc).copy()
+    # largest_cc = max(nx.strongly_connected_components(G_raw), key=len)
+    # G = G_raw.subgraph(largest_cc).copy()
 
-    ## Coordinate DICT INDEX
-    # Einmalig beim Startup anlegen (in load_graph):
-    coords_dict = dict(zip(nodes_gdf['id'], zip(nodes_gdf['lat'], nodes_gdf['lon'])))
-
-    # In der Heuristik direkt vom Dictionary abfragen:
-
-    
     # Nur Nodes behalten, die auch im zusammenhängenden Graphen vorkommen
-    nodes_gdf = nodes_gdf[nodes_gdf['id'].isin(G.nodes)].copy()
-    print("Kartendaten erfolgreich im Backend einsatzbereit!")
+    # nodes_gdf = nodes_gdf[nodes_gdf['id'].isin(G.nodes)].copy()
+    print("Kartendaten erfolgreich geladen. Einsatzbereit.")
 
 
 # Sagt der App, dass am beim Start die Kartendaten gelanden werden soll
@@ -63,8 +55,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 def haversine_distance(coord1, coord2):
     R = 6371000.0
@@ -261,3 +251,5 @@ async def stream_route(start_lat: float, start_lon: float, target_lat: float, ta
             }
 
     return EventSourceResponse(event_generator())
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")

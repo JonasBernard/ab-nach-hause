@@ -76,7 +76,7 @@
 
     const s = startMarker.getLatLng();
     const t = targetMarker.getLatLng();
-    const url = `http://localhost:8000/stream-route?start_lat=${s.lat}&start_lon=${s.lng}&target_lat=${t.lat}&target_lon=${t.lng}`;
+    const url = `/stream-route?start_lat=${s.lat}&start_lon=${s.lng}&target_lat=${t.lat}&target_lon=${t.lng}`;
     
     eventSource = new EventSource(url);
 
