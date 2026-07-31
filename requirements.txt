@@ -1,4 +1,5 @@
 networkx
+igraph
 pyrosm
 jupyter
 matplotlib
