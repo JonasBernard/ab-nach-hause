@@ -1,0 +1,7 @@
+networkx
+pyrosm
+jupyter
+matplotlib
+fastapi
+uvicorn[standard]>=0.22.0
+sse-starlette>=1.6.0

@@ -1,6 +1,16 @@
 {
   "name": "Mathe-At-Home: Ab nach Hause",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "../",
+    "args": {
+      "VERSION": "3.11-bullseye",
+      "USERNAME": "vscode",
+      "USER_UID": "1000",
+      "USER_GID": "${localEnv:$USER_UID}" // yes, this should be UID not GID, see https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user
+    }
+  },
 
   "customizations": {
     "vscode": {
@@ -10,14 +20,13 @@
       },
       "extensions": [
         "ms-python.python",
-        "ms-toolsai.jupyter",
         "ms-python.vscode-pylance",
-        "ms-vsliveshare.vsliveshare"
+        "ms-toolsai.jupyter",
+        "ms-vsliveshare.vsliveshare",
+        "tomoki1207.pdf"
       ]
     }
   },
-
-  "postCreateCommand": "pip install --upgrade pip && pip install networkx pyrosm jupyter matplotlib",
 
   "forwardPorts": [8080],
 
@@ -28,6 +37,12 @@
     }
   },
 
-  //"remoteUser": "vscode"
+  "hostRequirements": {
+    "memory": "16gb",
+    "storage": "2gb"
+  },
+
+  "remoteUser": "vscode",
+  "containerUser": "vscode"
 }
 
