@@ -1,0 +1,9 @@
+{
+  "filename": "osm_data/Darmstadt.osm.pbf",
+  "pbf_viewport": {
+    "left_lower": [49.8640, 8.6000],
+    "right_upper": [49.9100, 8.7200]
+  },
+  "default_start": [49.8721, 8.6512],
+  "default_target": [49.8776, 8.6564]
+}

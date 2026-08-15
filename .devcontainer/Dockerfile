@@ -6,7 +6,7 @@ RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r /tmp/pip-tmp/requirements.txt \
     && rm -rf /tmp/pip-tmp
 
-RUN sudo apt update -y && sudo apt install -y vim
+RUN sudo apt update -y --allow-insecure-repositories --allow-unauthenticated && sudo apt install -y vim
 
 # See https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user#_change-the-uidgid-of-an-existing-container-user
 ARG USERNAME=vscode
