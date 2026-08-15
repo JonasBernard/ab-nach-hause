@@ -3,6 +3,7 @@ import math
 import json
 import heapq
 import asyncio
+from pathlib import Path
 import pyrosm
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
@@ -11,13 +12,52 @@ from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 from scipy.spatial import cKDTree
 
-pbf_file = "osm_data/kiel.osm.pbf"
-pbf_viewport = {
-    "left_lower": [54.231,9.882],
-    "right_upper": [54.416, 10.383]
-}
-default_start = [54.33801, 10.14178]
-default_target = [54.30776, 10.14546]
+BASE_DIR = Path(__file__).resolve().parent
+
+pbf_file = ""
+pbf_viewport = {}
+default_start = []
+default_target = []
+
+
+def read_city_config(config_path: str | os.PathLike | None = None):
+    """Read a city config JSON file and populate the routing defaults."""
+    global pbf_file, pbf_viewport, default_start, default_target
+
+    config_file = Path(config_path) if config_path is not None else BASE_DIR / "osm_data" / "city_config.json"
+    if not config_file.is_absolute():
+        config_file = BASE_DIR / config_file
+
+    if not config_file.exists():
+        raise FileNotFoundError(f"Config file '{config_file}' not found.")
+
+    with config_file.open("r", encoding="utf-8") as fh:
+        config = json.load(fh)
+
+    required_fields = ["default_start", "default_target", "pbf_viewport", "filename"]
+    missing_fields = [field for field in required_fields if field not in config]
+    if missing_fields:
+        raise KeyError(f"Config file '{config_file}' is missing required fields: {missing_fields}")
+
+    pbf_viewport = config["pbf_viewport"]
+    default_start = config["default_start"]
+    default_target = config["default_target"]
+
+    filename = config["filename"]
+    pbf_path = Path(filename)
+    if not pbf_path.is_absolute():
+        pbf_path = BASE_DIR / pbf_path
+    pbf_file = str(pbf_path)
+
+    return {
+        "filename": pbf_file,
+        "default_start": default_start,
+        "default_target": default_target,
+        "pbf_viewport": pbf_viewport,
+    }
+
+
+read_city_config()
 
 stream_edges = False
 batch_size = 10
@@ -34,11 +74,11 @@ def load_graph():
     osm = pyrosm.OSM(pbf_file)
     #nodes_gdf_walking, edges_gdf_walking = osm.get_network(network_type="walking", nodes=True)
     #nodes_gdf_driving, edges_gdf_driving = osm.get_network(network_type="driving", nodes=True)
-    #nodes_gdf_cycling, edges_gdf_cycling = osm.get_network(network_type="cycling", nodes=True)
+    nodes_gdf_cycling, edges_gdf_cycling = osm.get_network(network_type="cycling", nodes=True)
     #nodes_gdf_driving_service, edges_gdf_driving_service = osm.get_network(network_type="driving+service", nodes=True)
-    nodes_gdf_all, edges_gdf_all = osm.get_network(network_type="all", nodes=True)
+    #nodes_gdf_all, edges_gdf_all = osm.get_network(network_type="all", nodes=True)
 
-    nodes_gdf, edges_gdf = nodes_gdf_all, edges_gdf_all
+    nodes_gdf, edges_gdf = nodes_gdf_cycling, edges_gdf_cycling
 
     # Graph aufbauen
     G = osm.to_graph(nodes_gdf, edges_gdf, simplify=True)
