@@ -19,7 +19,7 @@ Context for AI agents working on this repo. Verbatim source: `course/prompts/bac
   | 3 | 20.10.2026 | 8 | 01.12.2026 |
   | 4 | 27.10.2026 | 9 | 08.12.2026 |
   | 5 | 10.11.2026 | 10 | 15.12.2026 |
-- Content schedule (German, per lesson) and optional extra topics: see `README.MD` → „Zeitplan“, „Optionale weitere Themen“.
+- Content schedule (German, per lesson), optional extra topics and numbered further-reading links ([1], [2], … referenced in class): see `README.MD` → „Zeitplan“, „Optionale weitere Themen“, „Weiterführende Links“. Append new links with the next number; never renumber.
 
 ## Mathe-AG At Home (framework)
 - Free online program of *Bundesweite Mathematik-Wettbewerbe* (Bildung & Begabung) for students from grade 6, all of Germany; topics beyond the school curriculum.

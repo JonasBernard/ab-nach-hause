@@ -36,6 +36,12 @@ Nach Bedarf – eine Ideenliste:
 - Öffi-Navigation, z. B. via PESP
 - Verkehrsmittelempfehlungen
 
+## Weiterführende Links
+
+- **[1]** [Just Passing Through – Amazon Last Mile Routing Research Challenge](https://www.math.uwaterloo.ca/tsp/amz/) (University of Waterloo): Siegerlösung eines Wettbewerbs zur Routenplanung für Paketzustellung
+- **[2]** [JPT Optimization – Code und Methode](https://www.math.uwaterloo.ca/tsp/amz/code.html) (University of Waterloo): Wie die Siegerlösung aus [1] funktioniert
+- **[3]** [Google Maps is unreasonably fast. Let me explain](https://www.youtube.com/watch?v=kS-CGkiPetQ) (Veritasium, YouTube, englisch)
+
 ## Links & Notizen
 
 https://www.openstreetmap.de/nutzen/daten/
