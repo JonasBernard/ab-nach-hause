@@ -9,7 +9,7 @@ Context for AI agents working on this repo. Verbatim source: `course/prompts/bac
 ## Course
 - Official title: *„Ab nach Hause – Wie Google Maps & Co. den optimalen Weg finden“*.
 - Topic: real-world application of maths – how navigation apps find routes. Map data (OpenStreetMap) → graph → **Dijkstra** and **A\***, in **Python**; result is a small web app.
-- Audience: students from **grade 11** onwards (leader's plan; the public listing says grade 10+). ~20 participants. Python experience helpful, not required.
+- Audience: students from **grade 10** onwards (confirmed by the leader; "11th grade" in `background.md` is outdated). ~20 participants. Python experience helpful, not required.
 - Format: **10 weekly online sessions, 90 min each, Tuesdays 17:00** (Microsoft Teams).
 - Dates (3 Nov dropped, appended at end):
   | # | Date | # | Date |
