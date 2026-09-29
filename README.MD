@@ -19,6 +19,23 @@ Immer dienstags, 17:00–18:30 Uhr.
 
 Am 03.11.2026 findet kein Termin statt.
 
+## Optionale weitere Themen
+
+Nach Bedarf – eine Ideenliste:
+
+- Zeitkomplexität von A*
+- Problem des Handlungsreisenden (TSP)
+- Turn-by-Turn-Navigation
+- Mobile App
+- Alternativrouten finden
+- Zwischenstopps
+- Routenumplanung
+- Speed-ups: Priority Queue, Arc-Flags usw.
+- Diskussionen: Wie verhält sich der Mensch im Verkehr? Was sind politische Themen in der Verkehrsplanung?
+- Open-Source-Lösungen ansehen, z. B. GraphHopper
+- Öffi-Navigation, z. B. via PESP
+- Verkehrsmittelempfehlungen
+
 ## Links & Notizen
 
 https://www.openstreetmap.de/nutzen/daten/
