@@ -8,14 +8,14 @@ Immer dienstags, 17:00–18:30 Uhr.
 |---|---|---|
 | 1 | 06.10.2026 | Kennenlernen / Motivation<br>Kartendaten herunterladen<br>Ziele / Nicht-Ziele |
 | 2 | 13.10.2026 | Graphen, Pfade<br>Kürzeste Pfade<br>Optimale Subpfade<br>(Positive) Kantengewichte |
-| 3 | 20.10.2026 | *folgt* |
-| 4 | 27.10.2026 | *folgt* |
-| 5 | 10.11.2026 | *folgt* |
-| 6 | 17.11.2026 | *folgt* |
-| 7 | 24.11.2026 | *folgt* |
-| 8 | 01.12.2026 | *folgt* |
-| 9 | 08.12.2026 | *folgt* |
-| 10 | 15.12.2026 | *folgt* |
+| 3 | 20.10.2026 | Kartendaten in Graphen verwandeln – in Theorie und Praxis |
+| 4 | 27.10.2026 | Einführung in Python und Programmieren<br>Kartendaten in Python laden |
+| 5 | 10.11.2026 | Was ist die beste Route? Kürzeste? Schnellste?<br>Einführung in Dijkstra, grobe Idee |
+| 6 | 17.11.2026 | Dijkstra verstehen und implementieren |
+| 7 | 24.11.2026 | Fehlersuche<br>Fertig implementieren<br>Heuristiken und A* |
+| 8 | 01.12.2026 | Individuelle/kreative Erweiterungen, z. B. Fahrradnavigation |
+| 9 | 08.12.2026 | Ausarbeitung<br>Wünsche der Teilnehmenden |
+| 10 | 15.12.2026 | Ergebnisse sichern<br>Präsentieren |
 
 Am 03.11.2026 findet kein Termin statt.
 
