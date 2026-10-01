@@ -1,0 +1,168 @@
+/* @theme kurs */
+
+/*
+ * Plain slide theme for "Ab nach Hause".
+ * Black text on white, Fira Sans, no decoration.
+ *
+ * Slide types (set per slide with <!-- _class: ... -->):
+ *   (none)   content slide: heading at top, text below
+ *   title    title slide of a deck
+ *   chapter  chapter divider
+ * Text left / image right: ![bg right:45% contain](img/file.png)
+ *
+ * Font paths are relative to the deck, so decks must live in decks/.
+ */
+
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 400; src: url('../theme/fonts/fira-sans-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 400; src: url('../theme/fonts/fira-sans-latin-ext-400-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'Fira Sans'; font-style: italic; font-weight: 400; src: url('../theme/fonts/fira-sans-latin-400-italic.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Fira Sans'; font-style: italic; font-weight: 400; src: url('../theme/fonts/fira-sans-latin-ext-400-italic.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 500; src: url('../theme/fonts/fira-sans-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 500; src: url('../theme/fonts/fira-sans-latin-ext-500-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 700; src: url('../theme/fonts/fira-sans-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 700; src: url('../theme/fonts/fira-sans-latin-ext-700-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'Fira Sans'; font-style: italic; font-weight: 700; src: url('../theme/fonts/fira-sans-latin-700-italic.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Fira Sans'; font-style: italic; font-weight: 700; src: url('../theme/fonts/fira-sans-latin-ext-700-italic.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'Fira Mono'; font-style: normal; font-weight: 400; src: url('../theme/fonts/fira-mono-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Fira Mono'; font-style: normal; font-weight: 400; src: url('../theme/fonts/fira-mono-latin-ext-400-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+
+:root {
+  --text: #000;
+  --muted: #555;
+  --background: #fff;
+  --font: 'Fira Sans', sans-serif;
+  --font-mono: 'Fira Mono', monospace;
+  --padding-x: 80px;
+}
+
+section {
+  width: 1280px;
+  height: 720px;
+  box-sizing: border-box;
+  padding: 64px var(--padding-x) 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 30px;
+  line-height: 1.45;
+}
+
+/* Headings */
+
+h1, h2, h3 {
+  margin: 0 0 0.8em;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+h1 { font-size: 46px; }
+h2 { font-size: 36px; }
+h3 { font-size: 30px; margin-bottom: 0.4em; }
+
+/* Text */
+
+p, ul, ol, blockquote, table, pre {
+  margin: 0 0 0.7em;
+}
+
+ul, ol { padding-left: 1.2em; }
+li { margin-bottom: 0.3em; }
+li > ul, li > ol { margin: 0.3em 0 0; }
+
+strong { font-weight: 700; }
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+blockquote {
+  margin-left: 0;
+  padding-left: 1.2em;
+  font-style: italic;
+}
+
+small, .klein {
+  font-size: 22px;
+  color: var(--muted);
+}
+
+/* Code: monochrome, no syntax colours */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+pre {
+  font-size: 24px;
+  line-height: 1.4;
+  padding: 0.6em 0.8em;
+  background: #f4f4f4;
+}
+
+pre code { font-size: inherit; }
+pre .hljs-comment { color: var(--muted); }
+
+/* Tables: thin rules only */
+
+table { border-collapse: collapse; }
+th, td { padding: 0.25em 0.9em 0.25em 0; text-align: left; }
+th { font-weight: 500; border-bottom: 1px solid var(--text); }
+
+/* Inline images */
+
+img { max-width: 100%; max-height: 520px; }
+
+/* Split background images get some breathing room */
+
+section[data-marpit-advanced-background="background"] figure {
+  margin: 48px !important;
+}
+
+/* Header, footer, page numbers (off unless enabled in a deck) */
+
+header, footer, section::after {
+  font-size: 18px;
+  color: var(--muted);
+}
+
+header { position: absolute; top: 24px; left: var(--padding-x); }
+footer { position: absolute; bottom: 24px; left: var(--padding-x); }
+section::after { right: 40px; bottom: 24px; }
+
+/* Title slide */
+
+section.title {
+  justify-content: center;
+}
+
+section.title h1 {
+  font-size: 58px;
+  margin-bottom: 0.4em;
+}
+
+section.title p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Chapter slide */
+
+section.chapter {
+  justify-content: center;
+}
+
+section.chapter h1 {
+  font-size: 58px;
+  margin: 0;
+}
+
+section.chapter p {
+  margin: 0.5em 0 0;
+  color: var(--muted);
+}

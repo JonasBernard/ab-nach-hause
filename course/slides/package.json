@@ -1,0 +1,12 @@
+{
+  "name": "ab-nach-hause-slides",
+  "private": true,
+  "description": "Slides for the course, written in Markdown and built with Marp",
+  "scripts": {
+    "build": "marp",
+    "watch": "marp --watch"
+  },
+  "devDependencies": {
+    "@marp-team/marp-cli": "4.5.1"
+  }
+}

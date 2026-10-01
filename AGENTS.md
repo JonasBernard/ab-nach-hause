@@ -21,6 +21,11 @@ Context for AI agents working on this repo. Verbatim source: `course/prompts/bac
   | 5 | 10.11.2026 | 10 | 15.12.2026 |
 - Content schedule (German, per lesson), optional extra topics and numbered further-reading links ([1], [2], … referenced in class): see `README.MD` → „Zeitplan“, „Optionale weitere Themen“, „Weiterführende Links“. Append new links with the next number; never renumber.
 
+## Slides
+- Workflow: leader writes a Markdown concept per lesson (`course/konzepte/lektionNN.md`); agent turns it into a Marp deck `course/slides/decks/lektionNN.md`; `npm run build` in `course/slides/` makes the PDF. Details: `course/slides/README.md`.
+- Decks are German and short (slides support the talk, they don't hold all content). Use only the theme's slide types: content, `title`, `chapter`, and `![bg right:45% contain](img/…)` for text left / image right.
+- Look: black on white, Fira Sans, no other visual elements (no colours, icons, emojis, decoration). Theme: `course/slides/theme/kurs.css`.
+
 ## Mathe-AG At Home (framework)
 - Free online program of *Bundesweite Mathematik-Wettbewerbe* (Bildung & Begabung) for students from grade 6, all of Germany; topics beyond the school curriculum.
 - Courses: 8–10 units of 60–90 min over ≤ 3 months, weekly; usually led by (two) teacher-training students; ~20 participants.

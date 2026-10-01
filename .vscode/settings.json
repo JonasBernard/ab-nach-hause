@@ -1,5 +1,8 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "files.autoSave": "off",
-    "workbench.editor.enablePreview": false
+    "workbench.editor.enablePreview": false,
+    "markdown.marp.themes": [
+        "./course/slides/theme/kurs.css"
+    ]
 }
