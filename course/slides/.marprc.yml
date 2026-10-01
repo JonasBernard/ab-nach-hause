@@ -1,0 +1,7 @@
+# Marp CLI config: build every deck in decks/ into a PDF in pdf/
+inputDir: decks
+output: pdf
+pdf: true
+themeSet: theme
+theme: kurs
+allowLocalFiles: true
